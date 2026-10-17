@@ -95,12 +95,3 @@ npm run dev                         # http://localhost:3000
 ## How I work on this repo
 
 Every change starts as an [issue](https://github.com/EmilioYared/mise/issues?q=is%3Aissue), goes on its own branch, and is merged through a [pull request](https://github.com/EmilioYared/mise/pulls?q=is%3Apr) once CI passes. Each PR explains what changed and how it was checked. Commits are small and use conventional messages (`feat(tasks): …`, `fix(rules): …`). Vercel builds a preview of every PR, so it can be tried before it merges.
-
-## How I used AI
-
-I built Mise with Claude Code as a pair programmer, as part of a job application. I made the product decisions, tested each change on its preview, and reviewed and merged every pull request. The AI wrote most of the code and tests in that direction. Where the direction mattered:
-
-- **Time zones.** Overdue status uses a time zone stored on the store. The AI's first suggestions were to hard-code Los Angeles, then to use the viewer's device clock. Neither works for a team spread across cities, where a manager needs to see the same answer as their staff.
-- **Scope.** No AI features and nothing paid. The brief was a team task app, and an AI feature would have been decoration.
-- **Testing what I saw.** On the preview I found that signing out and back in left the sign-in buttons stuck, and that switching filters jumped the page. I sent both back. The first turned out to be state that Next keeps alive on pages you leave.
-- **Security first.** The rules and their tests went in before the screens. Reviewing the rules while building approvals showed that a request could be created with a decision already filled in. The rules were tightened, with tests for it.
