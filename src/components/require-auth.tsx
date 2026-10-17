@@ -31,7 +31,15 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   }
 
   if (state.status !== "signed-in") {
-    return <p className="m-auto text-sm text-zinc-500">Loading…</p>;
+    return (
+      <div className="m-auto flex flex-col items-center gap-4 text-ink-soft">
+        <span
+          aria-hidden
+          className="ticket-edge block h-16 w-12 animate-bounce bg-ticket shadow-[0_8px_14px_-8px_rgba(27,33,39,0.5)]"
+        />
+        <p className="text-sm">Loading your store…</p>
+      </div>
+    );
   }
 
   return <>{children}</>;
