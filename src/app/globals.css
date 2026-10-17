@@ -20,6 +20,31 @@
   --font-text: var(--font-public-sans);
 }
 
+/* Scrollbar: a steel rail with an ink grip. Chrome and Edge ignore the
+   ::-webkit-scrollbar styles once scrollbar-color is set, so the standard
+   properties are only for browsers without them (Firefox). */
+@supports not selector(::-webkit-scrollbar) {
+  html {
+    scrollbar-color: var(--color-rail) var(--color-steel);
+    scrollbar-width: thin;
+  }
+}
+::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-steel);
+}
+::-webkit-scrollbar-thumb {
+  border: 3px solid var(--color-steel);
+  border-radius: 999px;
+  background: linear-gradient(90deg, #b7bec5, var(--color-rail), #6f787f);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-ink-soft);
+}
+
 body {
   background: var(--color-steel);
   color: var(--color-ink);

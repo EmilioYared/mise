@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "motion/react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { Sheet } from "@/components/ui/sheet";
 import { isOverdue } from "@/lib/dates";
@@ -24,6 +24,10 @@ type Filter = "open" | "overdue" | "done";
 
 // How long a finished ticket stays in view, so its stamp can land.
 const LINGER_MS = 1100;
+// After a filter change the list keeps its old height while tickets swap,
+// then eases down to its new height.
+const HOLD_MS = 350;
+const RELEASE_MS = 600;
 
 type Props = { profile: UserProfile; store: Store };
 
@@ -36,6 +40,11 @@ export function TaskBoard({ profile, store }: Props) {
   // "new" for the create sheet, a task id while editing that task.
   const [editing, setEditing] = useState<string | null>(null);
   const [lingering, setLingering] = useState<string[]>([]);
+  const listRef = useRef<HTMLDivElement>(null);
+  const holdTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  // While set, the list keeps at least this height.
+  const [heldHeight, setHeldHeight] = useState<number>();
+  const [releasing, setReleasing] = useState(false);
 
   const isManager = profile.role === "manager";
   const names = new Map(assignees.map((p) => [p.uid, p.name]));
@@ -100,6 +109,36 @@ export function TaskBoard({ profile, store }: Props) {
     }
   }
 
+  // Switching to a shorter list would make the page shorter than the scroll
+  // position, and the browser would snap up in a single frame. Instead the
+  // list holds its old height while the tickets swap, then eases down to the
+  // new height, and the page follows it smoothly.
+  function changeFilter(next: Filter) {
+    if (next === filter) return;
+    holdTimers.current.forEach(clearTimeout);
+    setReleasing(false);
+    if (listRef.current) setHeldHeight(listRef.current.offsetHeight);
+    setFilter(next);
+
+    holdTimers.current = [
+      setTimeout(() => {
+        // Ease to the new list's own height, so the page shrinks evenly
+        // over the whole transition rather than all at the end.
+        const children = [...(listRef.current?.children ?? [])];
+        const natural = children.reduce(
+          (sum, el) => sum + (el as HTMLElement).offsetHeight,
+          0,
+        );
+        setReleasing(true);
+        setHeldHeight(natural);
+      }, HOLD_MS),
+      setTimeout(() => {
+        setReleasing(false);
+        setHeldHeight(undefined);
+      }, HOLD_MS + RELEASE_MS),
+    ];
+  }
+
   const closeSheet = () => setEditing(null);
 
   return (
@@ -110,7 +149,7 @@ export function TaskBoard({ profile, store }: Props) {
         <Segmented
           label="Show"
           value={filter}
-          onChange={setFilter}
+          onChange={changeFilter}
           options={[
             { value: "open", label: "To do", count: counts.open },
             { value: "overdue", label: "Overdue", count: counts.overdue },
@@ -137,7 +176,15 @@ export function TaskBoard({ profile, store }: Props) {
         </div>
       </div>
 
-      <div className="mt-6">
+      <div
+        ref={listRef}
+        className={`mt-6 ${
+          releasing
+            ? "transition-[min-height] duration-600 ease-in-out motion-reduce:transition-none"
+            : ""
+        }`}
+        style={heldHeight !== undefined ? { minHeight: heldHeight } : undefined}
+      >
         {tasks.status === "loading" && (
           <p className="text-sm text-ink-soft">Loading tasks…</p>
         )}
