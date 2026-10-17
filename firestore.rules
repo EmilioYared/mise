@@ -1,0 +1,112 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---- Helpers ----------------------------------------------------------
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // The caller's profile. Profiles are written only by the server (Admin
+    // SDK), so role and storeId can be trusted here.
+    function me() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isManagerOf(storeId) {
+      return signedIn() && me().role == "manager" && me().storeId == storeId;
+    }
+
+    function isMemberOf(storeId) {
+      return signedIn() && me().storeId == storeId;
+    }
+
+    function userIsInStore(uid, storeId) {
+      return get(/databases/$(database)/documents/users/$(uid)).data.storeId == storeId;
+    }
+
+    function unchanged(field) {
+      return request.resource.data[field] == resource.data[field];
+    }
+
+    function validTask(data) {
+      return data.title is string
+        && data.title.size() > 0
+        && data.title.size() <= 200
+        && data.priority in ["low", "medium", "high"]
+        && data.dueDate is string
+        && data.dueDate.matches("^[0-9]{4}-[0-9]{2}-[0-9]{2}$")
+        && data.done is bool;
+    }
+
+    // ---- Stores -----------------------------------------------------------
+
+    match /stores/{storeId} {
+      allow read: if isMemberOf(storeId);
+      allow write: if false;
+    }
+
+    // ---- Users ------------------------------------------------------------
+
+    match /users/{uid} {
+      allow read: if signedIn()
+        && (request.auth.uid == uid || isManagerOf(resource.data.storeId));
+      // No client writes: otherwise anyone could make themselves a manager.
+      allow write: if false;
+    }
+
+    // ---- Tasks ------------------------------------------------------------
+
+    match /tasks/{taskId} {
+      function canAccess() {
+        return signedIn()
+          && (resource.data.ownerId == request.auth.uid
+              || isManagerOf(resource.data.storeId));
+      }
+
+      allow read, delete: if canAccess();
+
+      // Staff create tasks for themselves; managers can assign tasks to
+      // anyone in their own store.
+      allow create: if signedIn()
+        && validTask(request.resource.data)
+        && isMemberOf(request.resource.data.storeId)
+        && (request.resource.data.ownerId == request.auth.uid
+            || (isManagerOf(request.resource.data.storeId)
+                && userIsInStore(request.resource.data.ownerId,
+                                 request.resource.data.storeId)));
+
+      // Nobody can move a task to another owner or store by editing it.
+      allow update: if canAccess()
+        && validTask(request.resource.data)
+        && unchanged("ownerId")
+        && unchanged("storeId");
+    }
+
+    // ---- Approvals --------------------------------------------------------
+
+    match /approvals/{approvalId} {
+      allow read: if signedIn()
+        && (resource.data.requesterId == request.auth.uid
+            || isManagerOf(resource.data.storeId));
+
+      allow create: if signedIn()
+        && request.resource.data.requesterId == request.auth.uid
+        && isMemberOf(request.resource.data.storeId)
+        && request.resource.data.status == "pending";
+
+      // Only the store's manager decides, only once, and only the decision
+      // fields may change.
+      allow update: if isManagerOf(resource.data.storeId)
+        && resource.data.status == "pending"
+        && request.resource.data.status in ["approved", "rejected"]
+        && request.resource.data.decidedBy == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(["status", "decidedBy", "decidedAt"]);
+
+      allow delete: if false;
+    }
+  }
+}
