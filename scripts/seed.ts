@@ -172,6 +172,7 @@ const approvals: Omit<Approval, "id">[] = [
     requesterId: "sam",
     storeId: "downtown-la",
     status: "pending",
+    createdAt: Date.now() - 2 * 3_600_000,
   },
   {
     title: "Extra produce order for Saturday",
@@ -179,12 +180,14 @@ const approvals: Omit<Approval, "id">[] = [
     requesterId: "jordan",
     storeId: "downtown-la",
     status: "pending",
+    createdAt: Date.now() - 5 * 3_600_000,
   },
   {
     title: "Day off on the 24th",
     requesterId: "sam",
     storeId: "downtown-la",
     status: "approved",
+    createdAt: Date.now() - 30 * 3_600_000,
     decidedBy: "maria",
     decidedAt: Date.now() - 86_400_000,
   },
@@ -193,6 +196,7 @@ const approvals: Omit<Approval, "id">[] = [
     requesterId: "theo",
     storeId: "brooklyn",
     status: "pending",
+    createdAt: Date.now() - 8 * 3_600_000,
   },
 ];
 
