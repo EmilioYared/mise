@@ -41,6 +41,19 @@ service cloud.firestore {
         && data.done is bool;
     }
 
+    // A new request carries only these fields, so nobody can submit one with
+    // a decision already filled in.
+    function validNewApproval(data) {
+      return data.keys().hasOnly(
+          ["title", "details", "requesterId", "storeId", "status", "createdAt"])
+        && data.title is string
+        && data.title.size() > 0
+        && data.title.size() <= 200
+        && (!("details" in data)
+            || (data.details is string && data.details.size() <= 1000))
+        && data.createdAt is number;
+    }
+
     // ---- Stores -----------------------------------------------------------
 
     match /stores/{storeId} {
@@ -95,7 +108,8 @@ service cloud.firestore {
       allow create: if signedIn()
         && request.resource.data.requesterId == request.auth.uid
         && isMemberOf(request.resource.data.storeId)
-        && request.resource.data.status == "pending";
+        && request.resource.data.status == "pending"
+        && validNewApproval(request.resource.data);
 
       // Only the store's manager decides, only once, and only the decision
       // fields may change.
@@ -103,6 +117,7 @@ service cloud.firestore {
         && resource.data.status == "pending"
         && request.resource.data.status in ["approved", "rejected"]
         && request.resource.data.decidedBy == request.auth.uid
+        && request.resource.data.decidedAt is number
         && request.resource.data.diff(resource.data).affectedKeys()
              .hasOnly(["status", "decidedBy", "decidedAt"]);
 
