@@ -170,6 +170,25 @@ describe("tasks", () => {
 });
 
 describe("users", () => {
+  it("lets a manager list their own team, but not another store's", async () => {
+    const users = collection(as("managerA"), "users");
+    await assertSucceeds(
+      getDocs(query(users, where("storeId", "==", "store1"))),
+    );
+    await assertFails(getDocs(query(users, where("storeId", "==", "store2"))));
+  });
+
+  it("does not let staff list their store's team", async () => {
+    await assertFails(
+      getDocs(
+        query(
+          collection(as("staffA"), "users"),
+          where("storeId", "==", "store1"),
+        ),
+      ),
+    );
+  });
+
   it("lets users read their own profile but not a colleague's", async () => {
     await assertSucceeds(getDoc(doc(as("staffA"), "users/staffA")));
     await assertFails(getDoc(doc(as("staffA"), "users/staffB")));

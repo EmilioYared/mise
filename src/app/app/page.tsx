@@ -2,6 +2,7 @@
 
 import { signOutUser, useAuth } from "@/components/auth-provider";
 import { RequireAuth } from "@/components/require-auth";
+import { TaskBoard } from "@/components/tasks/task-board";
 
 function Dashboard() {
   const state = useAuth();
@@ -23,6 +24,7 @@ function Dashboard() {
           Sign out
         </button>
       </header>
+      <TaskBoard profile={profile} store={store} />
     </main>
   );
 }
