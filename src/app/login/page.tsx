@@ -35,6 +35,16 @@ export default function LoginPage() {
   // The email being signed in, so the right button shows progress.
   const [pending, setPending] = useState<string | null>(null);
 
+  // Next keeps this page alive in the background after a successful sign-in,
+  // so "signing in" would still be set after the user signs out and comes
+  // back, leaving every button disabled. Clear it whenever the user is
+  // signed out again.
+  const [lastStatus, setLastStatus] = useState(state.status);
+  if (state.status !== lastStatus) {
+    setLastStatus(state.status);
+    if (state.status === "signed-out") setPending(null);
+  }
+
   useEffect(() => {
     if (state.status === "signed-in") router.replace("/app");
   }, [state.status, router]);
