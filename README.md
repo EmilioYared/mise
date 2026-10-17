@@ -4,7 +4,14 @@ Tasks and approvals for restaurant teams working across several locations.
 
 > _Mise en place_: everything in its place before service starts.
 
-**Status:** in progress. See the [open issues](https://github.com/EmilioYared/mise/issues) for what's being built next.
+**Live demo:** [mise-tasks.vercel.app](https://mise-tasks.vercel.app). Sign in with one of the demo buttons:
+
+| Account       | Sees                                           |
+| ------------- | ---------------------------------------------- |
+| Store manager | The whole Downtown LA store; approves requests |
+| Staff member  | Only their own tasks and requests              |
+
+Demo data is reset with `npm run seed`.
 
 ## What it does
 
