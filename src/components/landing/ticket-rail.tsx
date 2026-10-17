@@ -1,6 +1,6 @@
 "use client";
 
-import { motion, useReducedMotion } from "motion/react";
+import { MotionConfig, motion } from "motion/react";
 
 type Ticket = {
   title: string;
@@ -21,8 +21,8 @@ const TICKETS: Ticket[] = [
   },
   {
     title: "Fryer thermostat replacement",
-    who: "Sam, for Maria",
-    due: "Waiting for approval",
+    who: "Sam",
+    due: "Waiting for Maria to approve",
     priority: "Medium",
     state: "waiting",
     tilt: 1.5,
@@ -52,47 +52,53 @@ const TICKETS: Ticket[] = [
   },
 ];
 
+// Two tickets fit a phone, three a small tablet, four a tablet, five a laptop.
+const VISIBILITY: Record<number, string> = {
+  2: "hidden sm:block",
+  3: "hidden md:block",
+  4: "hidden lg:block",
+};
+
 /**
  * The page's one automatic motion: tickets drop onto the rail and settle,
- * the way they land on the pass during service.
+ * the way they land on the pass during service. With reduced motion on,
+ * MotionConfig makes them appear in place instead of falling.
  */
 export function TicketRail() {
-  const reduceMotion = useReducedMotion();
-
   return (
-    <div className="relative overflow-hidden pt-3 pb-10">
-      {/* The rail itself */}
-      <div
-        aria-hidden
-        className="absolute inset-x-0 top-3 h-3 bg-linear-to-b from-[#b7bec5] via-rail to-[#6f787f] shadow-[0_2px_0_rgba(27,33,39,0.15)]"
-      />
-      <ul className="relative mx-auto flex max-w-6xl gap-4 px-4 sm:gap-6 sm:px-6">
-        {TICKETS.map((ticket, i) => (
-          <motion.li
-            key={ticket.title}
-            className={`relative w-44 shrink-0 origin-top sm:w-52 ${i > 2 ? "hidden md:block" : ""} ${i > 3 ? "md:hidden lg:block" : ""}`}
-            initial={
-              reduceMotion ? false : { y: -260, rotate: ticket.tilt * 4 }
-            }
-            animate={{ y: 0, rotate: ticket.tilt }}
-            transition={{
-              type: "spring",
-              stiffness: 170,
-              damping: 11,
-              mass: 0.9,
-              delay: 0.25 + i * 0.12,
-            }}
-          >
-            {/* Clip holding the ticket to the rail */}
-            <span
-              aria-hidden
-              className="absolute -top-1 left-1/2 z-10 h-5 w-9 -translate-x-1/2 rounded-sm bg-ink/85"
-            />
-            <TicketCard ticket={ticket} />
-          </motion.li>
-        ))}
-      </ul>
-    </div>
+    <MotionConfig reducedMotion="user">
+      <div className="relative overflow-hidden pt-3 pb-10">
+        {/* The rail itself */}
+        <div
+          aria-hidden
+          className="absolute inset-x-0 top-3 h-3 bg-linear-to-b from-[#b7bec5] via-rail to-[#6f787f] shadow-[0_2px_0_rgba(27,33,39,0.15)]"
+        />
+        <ul className="relative mx-auto flex max-w-6xl gap-4 px-4 sm:gap-6 sm:px-6">
+          {TICKETS.map((ticket, i) => (
+            <motion.li
+              key={ticket.title}
+              className={`relative w-44 shrink-0 origin-top sm:w-52 ${VISIBILITY[i] ?? ""}`}
+              initial={{ y: -260, rotate: ticket.tilt * 4 }}
+              animate={{ y: 0, rotate: ticket.tilt }}
+              transition={{
+                type: "spring",
+                stiffness: 170,
+                damping: 11,
+                mass: 0.9,
+                delay: 0.25 + i * 0.12,
+              }}
+            >
+              {/* Clip holding the ticket to the rail */}
+              <span
+                aria-hidden
+                className="absolute -top-1 left-1/2 z-10 h-5 w-9 -translate-x-1/2 rounded-sm bg-ink/85"
+              />
+              <TicketCard ticket={ticket} />
+            </motion.li>
+          ))}
+        </ul>
+      </div>
+    </MotionConfig>
   );
 }
 
