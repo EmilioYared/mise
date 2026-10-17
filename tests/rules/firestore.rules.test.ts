@@ -36,6 +36,7 @@ const approval = {
   requesterId: "staffA",
   storeId: "store1",
   status: "pending",
+  createdAt: 1,
 };
 
 beforeAll(async () => {
@@ -223,6 +224,60 @@ describe("approvals", () => {
         requesterId: "staffB",
         status: "approved",
       }),
+    );
+  });
+
+  it("does not let staff submit a request with a decision filled in", async () => {
+    await assertFails(
+      setDoc(doc(as("staffB"), "approvals/new1"), {
+        ...approval,
+        requesterId: "staffB",
+        decidedBy: "staffB",
+      }),
+    );
+  });
+
+  it("rejects a request with an empty title", async () => {
+    await assertFails(
+      setDoc(doc(as("staffB"), "approvals/new1"), {
+        ...approval,
+        requesterId: "staffB",
+        title: "",
+      }),
+    );
+  });
+
+  it("does not let staff submit a request for another store", async () => {
+    await assertFails(
+      setDoc(doc(as("staffB"), "approvals/new1"), {
+        ...approval,
+        requesterId: "staffB",
+        storeId: "store2",
+      }),
+    );
+  });
+
+  it("lets staff list their own requests and managers their store's", async () => {
+    const mine = query(
+      collection(as("staffA"), "approvals"),
+      where("requesterId", "==", "staffA"),
+    );
+    await assertSucceeds(getDocs(mine));
+    await assertFails(
+      getDocs(
+        query(
+          collection(as("staffA"), "approvals"),
+          where("storeId", "==", "store1"),
+        ),
+      ),
+    );
+    await assertSucceeds(
+      getDocs(
+        query(
+          collection(as("managerA"), "approvals"),
+          where("storeId", "==", "store1"),
+        ),
+      ),
     );
   });
 

@@ -35,6 +35,8 @@ export interface Approval {
   requesterId: string;
   storeId: string;
   status: ApprovalStatus;
+  /** Milliseconds since the epoch; used only to order the list. */
+  createdAt: number;
   decidedBy?: string;
   decidedAt?: number;
 }
