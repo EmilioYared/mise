@@ -13,6 +13,7 @@ import {
 } from "firebase/firestore";
 import { useEffect, useState } from "react";
 import { firebase } from "@/lib/firebase/client";
+import { resolve, type Loadable, type Result } from "@/lib/live";
 import { normalizePriority } from "@/lib/priority";
 import type { Priority, Task, UserProfile } from "@/lib/types";
 
@@ -22,21 +23,6 @@ export type TaskInput = {
   priority: Priority;
   ownerId: string;
 };
-
-// A result remembers which query it came from, so switching users never shows
-// the previous user's tasks for a moment.
-type Result<T> = { key: string; value: T } | { key: string; error: Error };
-
-export type Loadable<T> =
-  | { status: "loading" }
-  | { status: "error"; error: Error }
-  | { status: "ready"; value: T };
-
-function resolve<T>(result: Result<T> | null, key: string): Loadable<T> {
-  if (!result || result.key !== key) return { status: "loading" };
-  if ("error" in result) return { status: "error", error: result.error };
-  return { status: "ready", value: result.value };
-}
 
 /**
  * Live list of the tasks this person can see: their own, or the whole store's
