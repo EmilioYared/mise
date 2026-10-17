@@ -1,20 +1,8 @@
 import type { Metadata } from "next";
-import { Big_Shoulders, Public_Sans } from "next/font/google";
 import Link from "next/link";
 import { SmoothScroll } from "@/components/landing/smooth-scroll";
 import { TicketRail } from "@/components/landing/ticket-rail";
 import { TimeScrubber } from "@/components/landing/time-scrubber";
-
-const display = Big_Shoulders({
-  subsets: ["latin"],
-  variable: "--font-big-shoulders",
-  axes: ["opsz"],
-});
-
-const text = Public_Sans({
-  subsets: ["latin"],
-  variable: "--font-public-sans",
-});
 
 export const metadata: Metadata = {
   title: "Mise: tasks and approvals for restaurant teams",
@@ -25,9 +13,7 @@ const REPO = "https://github.com/EmilioYared/mise";
 export default function Home() {
   return (
     <SmoothScroll>
-      <div
-        className={`${display.variable} ${text.variable} min-h-full flex-1 bg-steel font-text text-ink`}
-      >
+      <div className="min-h-full flex-1 bg-steel font-text text-ink">
         <header className="mx-auto flex max-w-6xl items-center justify-between px-4 py-5 sm:px-6">
           <span className="font-display text-3xl font-black">Mise</span>
           <Link
