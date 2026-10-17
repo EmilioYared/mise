@@ -165,7 +165,7 @@ function ApprovalTicket({
       <article
         className={`ticket-edge relative flex h-full flex-col gap-3 bg-ticket px-5 pt-7 pb-5 shadow-[0_12px_20px_-12px_rgba(27,33,39,0.5)] ${
           muted ? "opacity-80" : ""
-        }`}
+        } ${pending ? "" : "pb-16"}`}
       >
         <p className="flex items-center justify-between gap-2 text-xs text-ink-soft">
           <span>{from ? `From ${from}` : "Request"}</span>
@@ -185,7 +185,7 @@ function ApprovalTicket({
 
         <AnimatePresence>
           {!pending && (
-            <motion.div key="stamp" className="absolute top-9 right-4">
+            <motion.div key="stamp" className="absolute right-4 bottom-4">
               <Stamp
                 label={approval.status === "approved" ? "Approved" : "Rejected"}
                 tone={approval.status === "approved" ? "basil" : "expo"}

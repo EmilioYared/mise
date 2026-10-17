@@ -14,6 +14,13 @@ const PRIORITY_STYLE: Record<Task["priority"], string> = {
   low: "bg-steel-deep text-ink-soft",
 };
 
+/** "Today" reads as "due today"; a date like "Oct 13" keeps its capital. */
+function dueLabel(label: string) {
+  return /^[A-Z][a-z]+day$|^Tomorrow$/.test(label)
+    ? label.toLowerCase()
+    : label;
+}
+
 /** A small, stable tilt per ticket, so the board looks hand-hung. */
 function tiltFor(id: string) {
   let hash = 0;
@@ -95,14 +102,14 @@ export function TaskItem({
           className={`mt-2 text-sm ${overdue ? "font-semibold text-expo" : "text-ink-soft"}`}
         >
           {overdue ? "Overdue, due " : "Due "}
-          {formatDue(task.dueDate, timeZone, now).toLowerCase()}
+          {dueLabel(formatDue(task.dueDate, timeZone, now))}
         </p>
 
         <AnimatePresence>
           {task.done && (
             <motion.div
               key="stamp"
-              className="absolute top-10 right-4"
+              className="absolute right-4 bottom-16"
               exit={{ opacity: 0 }}
             >
               <Stamp label="Done" tone="basil" />

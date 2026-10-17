@@ -49,14 +49,18 @@ export function TaskBoard({ profile, store }: Props) {
     done: all.filter((t) => t.done).length,
   };
 
+  // A ticket that was just finished keeps its place while its stamp lands,
+  // so it's sorted as if it were still open.
+  const shown = all.filter((t) => {
+    if (filter === "open") return !t.done || lingering.includes(t.id);
+    if (filter === "overdue") return overdueOf(t);
+    return t.done;
+  });
+  const byId = new Map(shown.map((t) => [t.id, t]));
   const visible = sortTasks(
-    all.filter((t) => {
-      if (filter === "open") return !t.done || lingering.includes(t.id);
-      if (filter === "overdue") return overdueOf(t);
-      return t.done;
-    }),
+    shown.map((t) => (lingering.includes(t.id) ? { ...t, done: false } : t)),
     sort,
-  );
+  ).map((t) => byId.get(t.id)!);
   const editingTask = all.find((t) => t.id === editing);
 
   function handleToggle(task: Task) {
