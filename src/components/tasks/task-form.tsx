@@ -1,10 +1,17 @@
 "use client";
 
+import { motion } from "motion/react";
 import { useState, type FormEvent } from "react";
 import { todayIn } from "@/lib/dates";
 import { DEFAULT_PRIORITY, PRIORITIES, PRIORITY_LABEL } from "@/lib/priority";
 import type { TaskInput } from "@/lib/tasks";
 import type { Priority, Task, UserProfile } from "@/lib/types";
+
+const PRIORITY_ON: Record<Priority, string> = {
+  high: "bg-expo text-white border-expo",
+  medium: "bg-mustard text-ink border-mustard",
+  low: "bg-steel-deep text-ink border-steel-deep",
+};
 
 type Props = {
   /** The task being edited; omit to create a new one. */
@@ -50,15 +57,12 @@ export function TaskForm({
   }
 
   const field =
-    "w-full rounded-lg border border-zinc-300 bg-transparent px-3 py-2 text-sm dark:border-zinc-700";
+    "w-full rounded-lg border-2 border-steel-deep bg-ticket px-3 py-2.5 focus:border-tape focus:outline-none";
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="grid gap-3 rounded-xl border border-zinc-200 p-4 dark:border-zinc-800"
-    >
-      <label className="grid gap-1 text-sm">
-        <span className="font-medium">Task</span>
+    <form onSubmit={handleSubmit} className="grid gap-5">
+      <label className="grid gap-1.5">
+        <span className="text-sm font-semibold">Task</span>
         <input
           autoFocus
           required
@@ -66,13 +70,35 @@ export function TaskForm({
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="e.g. Count walk-in inventory"
-          className={field}
+          className={`${field} font-display text-2xl font-bold`}
         />
       </label>
 
-      <div className="grid gap-3 sm:grid-cols-3">
-        <label className="grid gap-1 text-sm">
-          <span className="font-medium">Due</span>
+      <fieldset>
+        <legend className="text-sm font-semibold">Priority</legend>
+        <div className="mt-1.5 grid grid-cols-3 gap-2">
+          {PRIORITIES.map((p) => (
+            <motion.button
+              key={p}
+              type="button"
+              whileTap={{ scale: 0.94 }}
+              aria-pressed={priority === p}
+              onClick={() => setPriority(p)}
+              className={`rounded-lg border-2 py-2 font-semibold transition-colors ${
+                priority === p
+                  ? PRIORITY_ON[p]
+                  : "border-steel-deep text-ink-soft hover:border-rail"
+              }`}
+            >
+              {PRIORITY_LABEL[p]}
+            </motion.button>
+          ))}
+        </div>
+      </fieldset>
+
+      <div className={`grid gap-4 ${canAssign ? "sm:grid-cols-2" : ""}`}>
+        <label className="grid gap-1.5">
+          <span className="text-sm font-semibold">Due</span>
           <input
             type="date"
             required
@@ -82,24 +108,9 @@ export function TaskForm({
           />
         </label>
 
-        <label className="grid gap-1 text-sm">
-          <span className="font-medium">Priority</span>
-          <select
-            value={priority}
-            onChange={(e) => setPriority(e.target.value as Priority)}
-            className={field}
-          >
-            {PRIORITIES.map((p) => (
-              <option key={p} value={p}>
-                {PRIORITY_LABEL[p]}
-              </option>
-            ))}
-          </select>
-        </label>
-
         {canAssign && (
-          <label className="grid gap-1 text-sm">
-            <span className="font-medium">Assign to</span>
+          <label className="grid gap-1.5">
+            <span className="text-sm font-semibold">Assign to</span>
             <select
               value={ownerId}
               onChange={(e) => setOwnerId(e.target.value)}
@@ -116,26 +127,27 @@ export function TaskForm({
       </div>
 
       {error && (
-        <p role="alert" className="text-sm text-red-600">
+        <p role="alert" className="text-sm font-medium text-expo">
           {error}
         </p>
       )}
 
-      <div className="flex justify-end gap-2">
+      <div className="flex justify-end gap-2 border-t border-dashed border-steel-deep pt-4">
         <button
           type="button"
           onClick={onCancel}
-          className="rounded-lg px-3 py-2 text-sm text-zinc-600 dark:text-zinc-400"
+          className="rounded-lg px-4 py-2.5 font-medium text-ink-soft hover:bg-steel"
         >
           Cancel
         </button>
-        <button
+        <motion.button
           type="submit"
+          whileTap={{ scale: 0.95 }}
           disabled={saving || !title.trim()}
-          className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-white dark:text-zinc-900"
+          className="rounded-lg bg-tape px-5 py-2.5 font-semibold text-white shadow-[0_2px_0_#1d4fa8] disabled:opacity-50"
         >
-          {saving ? "Saving…" : task ? "Save" : "Add task"}
-        </button>
+          {saving ? "Saving…" : task ? "Save changes" : "Add task"}
+        </motion.button>
       </div>
     </form>
   );
