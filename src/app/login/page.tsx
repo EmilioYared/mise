@@ -2,11 +2,19 @@
 
 import { FirebaseError } from "firebase/app";
 import { signInWithEmailAndPassword } from "firebase/auth";
+import { motion } from "motion/react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import { useAuth } from "@/components/auth-provider";
 import { DEMO_ACCOUNTS, DEMO_PASSWORD } from "@/lib/demo";
 import { firebase } from "@/lib/firebase/client";
+
+const DEMO_DETAILS: Record<string, string> = {
+  manager:
+    "Sees the whole Downtown LA store, assigns tasks and approves requests.",
+  staff: "Sees only their own tasks, and sends requests to the manager.",
+};
 
 function messageFor(error: unknown) {
   if (
@@ -24,14 +32,15 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [pending, setPending] = useState(false);
+  // The email being signed in, so the right button shows progress.
+  const [pending, setPending] = useState<string | null>(null);
 
   useEffect(() => {
     if (state.status === "signed-in") router.replace("/app");
   }, [state.status, router]);
 
   async function signIn(emailToUse: string, passwordToUse: string) {
-    setPending(true);
+    setPending(emailToUse);
     setError(null);
     try {
       await signInWithEmailAndPassword(
@@ -41,7 +50,7 @@ export default function LoginPage() {
       );
     } catch (err) {
       setError(messageFor(err));
-      setPending(false);
+      setPending(null);
     }
   }
 
@@ -50,60 +59,113 @@ export default function LoginPage() {
     void signIn(email, password);
   }
 
+  const field =
+    "w-full rounded-lg border-2 border-steel-deep bg-ticket px-3 py-2.5 focus:border-tape focus:outline-none";
+
   return (
-    <main className="m-auto w-full max-w-sm p-6">
-      <h1 className="text-2xl font-semibold tracking-tight">Sign in to Mise</h1>
+    <div className="flex min-h-full flex-1 flex-col bg-steel font-text text-ink">
+      <header className="mx-auto flex w-full max-w-5xl items-center px-4 py-5 sm:px-6">
+        <Link href="/" className="font-display text-3xl font-black">
+          Mise
+        </Link>
+      </header>
 
-      <form onSubmit={onSubmit} className="mt-6 space-y-3">
-        <input
-          type="email"
-          required
-          placeholder="Email"
-          autoComplete="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="w-full rounded-md border border-zinc-300 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-900"
-        />
-        <input
-          type="password"
-          required
-          placeholder="Password"
-          autoComplete="current-password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="w-full rounded-md border border-zinc-300 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-900"
-        />
-        {error && (
-          <p role="alert" className="text-sm text-red-600">
-            {error}
+      <main className="mx-auto grid w-full max-w-5xl flex-1 gap-12 px-4 pt-6 pb-16 sm:px-6 md:grid-cols-[minmax(0,6fr)_minmax(0,5fr)] md:gap-16">
+        <section>
+          <h1 className="font-display text-6xl leading-[0.9] font-black sm:text-7xl">
+            Pick a station.
+          </h1>
+          <p className="mt-4 max-w-[46ch] text-ink-soft">
+            Two demo accounts are ready with sample tasks and requests. Choose
+            one to sign in straight away.
           </p>
-        )}
-        <button
-          type="submit"
-          disabled={pending}
-          className="w-full rounded-md bg-zinc-900 px-3 py-2 text-white disabled:opacity-50 dark:bg-white dark:text-zinc-900"
-        >
-          {pending ? "Signing in…" : "Sign in"}
-        </button>
-      </form>
 
-      <div className="mt-8 border-t border-zinc-200 pt-6 dark:border-zinc-800">
-        <p className="text-sm text-zinc-500">
-          Just looking? Try a demo account:
-        </p>
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          {Object.values(DEMO_ACCOUNTS).map((account) => (
-            <button
-              key={account.email}
-              disabled={pending}
-              onClick={() => signIn(account.email, DEMO_PASSWORD)}
-              className="rounded-md border border-zinc-300 px-3 py-2 text-sm disabled:opacity-50 dark:border-zinc-700"
+          <div className="mt-8 grid gap-5 sm:grid-cols-2">
+            {Object.entries(DEMO_ACCOUNTS).map(([key, account], i) => {
+              const busy = pending === account.email;
+              return (
+                <motion.button
+                  key={account.email}
+                  disabled={pending !== null}
+                  onClick={() => signIn(account.email, DEMO_PASSWORD)}
+                  initial={{ opacity: 0, y: -40, rotate: i ? 3 : -3 }}
+                  animate={{ opacity: 1, y: 0, rotate: i ? 1.2 : -1.2 }}
+                  whileHover={{ y: -6, rotate: 0 }}
+                  whileTap={{ scale: 0.97 }}
+                  transition={{
+                    type: "spring",
+                    stiffness: 260,
+                    damping: 18,
+                    delay: 0.1 + i * 0.1,
+                  }}
+                  className="ticket-edge flex flex-col items-start bg-ticket px-5 pt-7 pb-5 text-left shadow-[0_14px_24px_-14px_rgba(27,33,39,0.55)] disabled:cursor-wait"
+                >
+                  <span className="font-display text-3xl leading-none font-black">
+                    {account.label}
+                  </span>
+                  <span className="mt-2 text-sm text-ink-soft">
+                    {DEMO_DETAILS[key]}
+                  </span>
+                  <span className="mt-5 w-full border-t border-dashed border-steel-deep pt-3 text-sm font-semibold text-tape">
+                    {busy
+                      ? "Signing in…"
+                      : "Sign in as " + account.label.toLowerCase()}
+                  </span>
+                </motion.button>
+              );
+            })}
+          </div>
+        </section>
+
+        <section className="md:pt-3">
+          <h2 className="font-display text-3xl font-black">
+            Or use your own account
+          </h2>
+          <form onSubmit={onSubmit} className="mt-5 grid gap-4">
+            <label className="grid gap-1.5">
+              <span className="text-sm font-semibold">Email</span>
+              <input
+                type="email"
+                required
+                autoComplete="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className={field}
+              />
+            </label>
+            <label className="grid gap-1.5">
+              <span className="text-sm font-semibold">Password</span>
+              <input
+                type="password"
+                required
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className={field}
+              />
+            </label>
+            {error && (
+              <motion.p
+                role="alert"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1, x: [0, -6, 6, -4, 4, 0] }}
+                transition={{ duration: 0.4 }}
+                className="text-sm font-medium text-expo"
+              >
+                {error}
+              </motion.p>
+            )}
+            <motion.button
+              type="submit"
+              whileTap={{ scale: 0.97 }}
+              disabled={pending !== null}
+              className="rounded-lg bg-ink px-4 py-3 font-semibold text-steel disabled:opacity-60"
             >
-              {account.label}
-            </button>
-          ))}
-        </div>
-      </div>
-    </main>
+              {pending === email && pending ? "Signing in…" : "Sign in"}
+            </motion.button>
+          </form>
+        </section>
+      </main>
+    </div>
   );
 }
