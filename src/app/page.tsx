@@ -48,7 +48,7 @@ export default function Home() {
               teams across locations. Cooks see their own work. Managers see the
               whole store and sign off requests from one screen.
             </p>
-            <div className="mt-8 flex flex-wrap items-center gap-3">
+            <div className="mt-8 flex flex-wrap items-center gap-x-8 gap-y-4">
               <Link
                 href="/login"
                 className="rounded-md bg-tape px-5 py-3 font-semibold text-white shadow-[0_2px_0_#1d4fa8] hover:brightness-110 focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-tape"
@@ -57,7 +57,7 @@ export default function Home() {
               </Link>
               <a
                 href={REPO}
-                className="rounded-md px-4 py-3 font-medium underline decoration-rail underline-offset-4 hover:decoration-ink focus-visible:outline-3 focus-visible:outline-tape"
+                className="rounded-sm py-1 font-medium underline decoration-rail underline-offset-4 hover:decoration-ink focus-visible:outline-3 focus-visible:outline-tape"
               >
                 Read the source on GitHub
               </a>
