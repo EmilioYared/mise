@@ -1,24 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
+import { useState, type ReactNode, type Ref } from "react";
+import { Sheet } from "@/components/ui/sheet";
+import { Stamp } from "@/components/ui/stamp";
 import { useApprovals } from "@/lib/approvals";
 import { useAssignees } from "@/lib/tasks";
 import type { Approval, UserProfile } from "@/lib/types";
 import { DecisionButtons } from "./decision-buttons";
 import { RequestForm } from "./request-form";
 
-const STATUS_STYLE: Record<Approval["status"], string> = {
-  pending: "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300",
-  approved:
-    "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",
-  rejected: "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",
-};
-
-const STATUS_LABEL: Record<Approval["status"], string> = {
-  pending: "Waiting",
-  approved: "Approved",
-  rejected: "Rejected",
-};
+// How long a decided ticket stays in view, so its stamp can land.
+const LINGER_MS = 1200;
 
 type Props = { profile: UserProfile };
 
@@ -26,95 +19,187 @@ export function ApprovalBoard({ profile }: Props) {
   const approvals = useApprovals(profile);
   const team = useAssignees(profile);
   const [composing, setComposing] = useState(false);
+  // Requests being decided right now stay on the "waiting" side until their
+  // stamp has landed, even once the live data says they're decided.
+  const [lingering, setLingering] = useState<string[]>([]);
 
   const isManager = profile.role === "manager";
   const names = new Map(team.map((p) => [p.uid, p.name]));
 
   if (approvals.status === "loading") {
-    return <p className="mt-8 text-sm text-zinc-500">Loading requests…</p>;
+    return <p className="mt-8 text-sm text-ink-soft">Loading requests…</p>;
   }
   if (approvals.status === "error") {
     return (
-      <p role="alert" className="mt-8 text-sm text-red-600">
+      <p role="alert" className="mt-8 text-sm text-expo">
         Couldn&apos;t load requests. Check your connection and refresh.
       </p>
     );
   }
 
-  const pending = approvals.value.filter((a) => a.status === "pending");
-  const decided = approvals.value.filter((a) => a.status !== "pending");
+  const holding = (a: Approval) => lingering.includes(a.id);
+  const waiting = approvals.value.filter(
+    (a) => a.status === "pending" || holding(a),
+  );
+  const decided = approvals.value.filter(
+    (a) => a.status !== "pending" && !holding(a),
+  );
 
-  function row(approval: Approval) {
-    return (
-      <li
-        key={approval.id}
-        className="flex items-start gap-3 rounded-xl border border-zinc-200 px-4 py-3 dark:border-zinc-800"
-      >
-        <div className="min-w-0 flex-1">
-          <p>{approval.title}</p>
-          {approval.details && (
-            <p className="mt-0.5 text-sm text-zinc-500">{approval.details}</p>
-          )}
-          {isManager && (
-            <p className="mt-1 text-xs text-zinc-500">
-              From {names.get(approval.requesterId) ?? "a team member"}
-            </p>
-          )}
-        </div>
-        {isManager && approval.status === "pending" ? (
-          <DecisionButtons approval={approval} managerId={profile.uid} />
-        ) : (
-          <span
-            className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_STYLE[approval.status]}`}
-          >
-            {STATUS_LABEL[approval.status]}
-          </span>
-        )}
-      </li>
-    );
-  }
+  const release = (id: string) =>
+    setLingering((ids) => ids.filter((x) => x !== id));
 
   return (
-    <section className="mt-8 grid gap-8">
-      <div>
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="text-lg font-semibold">
+    <>
+      <div className="mt-8 flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="font-display text-5xl leading-none font-black">
             {isManager ? "Waiting for you" : "My requests"}
-          </h2>
-          {!isManager && (
-            <button
-              onClick={() => setComposing(true)}
-              disabled={composing}
-              className="rounded-lg bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50 dark:bg-white dark:text-zinc-900"
-            >
-              New request
-            </button>
-          )}
-        </div>
-
-        {composing && (
-          <div className="mt-4">
-            <RequestForm profile={profile} onDone={() => setComposing(false)} />
-          </div>
-        )}
-
-        {pending.length === 0 ? (
-          <p className="mt-4 rounded-xl border border-dashed border-zinc-300 p-8 text-center text-sm text-zinc-500 dark:border-zinc-700">
+          </h1>
+          <p className="mt-2 text-ink-soft">
             {isManager
-              ? "Nothing to approve. All caught up."
-              : "No open requests."}
+              ? "Requests from your team. Approve or reject each one."
+              : "Ask your manager for supplies, repairs or time off."}
           </p>
-        ) : (
-          <ul className="mt-4 grid gap-2">{pending.map(row)}</ul>
+        </div>
+        {!isManager && (
+          <motion.button
+            whileTap={{ scale: 0.95 }}
+            onClick={() => setComposing(true)}
+            className="rounded-lg bg-tape px-4 py-2.5 font-semibold text-white shadow-[0_2px_0_#1d4fa8] hover:brightness-110"
+          >
+            New request
+          </motion.button>
         )}
       </div>
 
-      {decided.length > 0 && (
-        <div>
-          <h2 className="text-lg font-semibold">Decided</h2>
-          <ul className="mt-4 grid gap-2">{decided.map(row)}</ul>
-        </div>
+      <ul className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        <AnimatePresence mode="popLayout">
+          {waiting.map((approval) => (
+            <ApprovalTicket
+              key={approval.id}
+              approval={approval}
+              from={isManager ? names.get(approval.requesterId) : undefined}
+            >
+              {isManager && approval.status === "pending" && (
+                <DecisionButtons
+                  approval={approval}
+                  managerId={profile.uid}
+                  onStart={() => setLingering((ids) => [...ids, approval.id])}
+                  onEnd={(saved) =>
+                    saved
+                      ? setTimeout(() => release(approval.id), LINGER_MS)
+                      : release(approval.id)
+                  }
+                />
+              )}
+            </ApprovalTicket>
+          ))}
+        </AnimatePresence>
+      </ul>
+
+      {waiting.length === 0 && (
+        <motion.p
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="rounded-2xl border-2 border-dashed border-steel-deep px-6 py-14 text-center font-display text-3xl font-black"
+        >
+          {isManager
+            ? "All caught up. Nothing to sign off."
+            : "No open requests."}
+        </motion.p>
       )}
-    </section>
+
+      {decided.length > 0 && (
+        <>
+          <h2 className="mt-14 font-display text-3xl font-black">Decided</h2>
+          <ul className="mt-4 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            <AnimatePresence mode="popLayout">
+              {decided.map((approval) => (
+                <ApprovalTicket
+                  key={approval.id}
+                  approval={approval}
+                  from={isManager ? names.get(approval.requesterId) : undefined}
+                  muted
+                />
+              ))}
+            </AnimatePresence>
+          </ul>
+        </>
+      )}
+
+      <Sheet
+        open={composing}
+        title="New request"
+        onClose={() => setComposing(false)}
+      >
+        <RequestForm profile={profile} onDone={() => setComposing(false)} />
+      </Sheet>
+    </>
+  );
+}
+
+function ApprovalTicket({
+  approval,
+  from,
+  muted,
+  children,
+  ref,
+}: {
+  approval: Approval;
+  from?: string;
+  muted?: boolean;
+  children?: ReactNode;
+  ref?: Ref<HTMLLIElement>;
+}) {
+  const pending = approval.status === "pending";
+
+  return (
+    <motion.li
+      ref={ref}
+      layout
+      initial={{ opacity: 0, y: -40, rotate: -2 }}
+      animate={{ opacity: 1, y: 0, rotate: 0 }}
+      exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
+      transition={{ type: "spring", stiffness: 320, damping: 26 }}
+    >
+      <article
+        className={`ticket-edge relative flex h-full flex-col gap-3 bg-ticket px-5 pt-7 pb-5 shadow-[0_12px_20px_-12px_rgba(27,33,39,0.5)] ${
+          muted ? "opacity-80" : ""
+        } ${pending ? "" : "pb-16"}`}
+      >
+        <p className="flex items-center justify-between gap-2 text-xs text-ink-soft">
+          <span>{from ? `From ${from}` : "Request"}</span>
+          {pending && !children && (
+            <span className="flex items-center gap-1.5 font-semibold text-ink">
+              <span className="size-2 animate-pulse rounded-full bg-mustard" />
+              Waiting
+            </span>
+          )}
+        </p>
+        <h3 className="font-display text-[1.7rem] leading-[1.02] font-bold">
+          {approval.title}
+        </h3>
+        {approval.details && (
+          <p className="text-sm text-ink-soft">{approval.details}</p>
+        )}
+
+        <AnimatePresence>
+          {!pending && (
+            <motion.div key="stamp" className="absolute right-4 bottom-4">
+              <Stamp
+                label={approval.status === "approved" ? "Approved" : "Rejected"}
+                tone={approval.status === "approved" ? "basil" : "expo"}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {children && (
+          <div className="mt-auto border-t border-dashed border-steel-deep pt-4">
+            {children}
+          </div>
+        )}
+      </article>
+    </motion.li>
   );
 }

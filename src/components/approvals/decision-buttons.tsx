@@ -1,6 +1,7 @@
 "use client";
 
 import { FirebaseError } from "firebase/app";
+import { motion } from "motion/react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -18,14 +19,25 @@ function messageFor(error: unknown) {
   return "Couldn't save your decision. Check your connection and try again.";
 }
 
-type Props = { approval: Approval; managerId: string };
+type Props = {
+  approval: Approval;
+  managerId: string;
+  /** Called when a decision starts, and when it ends (saved or not). */
+  onStart: () => void;
+  onEnd: (saved: boolean) => void;
+};
 
 /**
- * Approve / Reject with every state visible: a spinner while saving, a toast
- * on success, an inline error on failure. A ref blocks a second click before
- * React has re-rendered the disabled buttons.
+ * Approve / Reject with every state visible: a spinner while saving, a stamp
+ * and a toast on success, an inline error on failure. A ref blocks a second
+ * click before React has re-rendered the disabled buttons.
  */
-export function DecisionButtons({ approval, managerId }: Props) {
+export function DecisionButtons({
+  approval,
+  managerId,
+  onStart,
+  onEnd,
+}: Props) {
   const [saving, setSaving] = useState<Decision | null>(null);
   const [error, setError] = useState<string | null>(null);
   const inFlight = useRef(false);
@@ -35,47 +47,61 @@ export function DecisionButtons({ approval, managerId }: Props) {
     inFlight.current = true;
     setSaving(decision);
     setError(null);
+    onStart();
     try {
       await decideApproval(approval, decision, managerId);
       toast.success(
         `${decision === "approved" ? "Approved" : "Rejected"}: ${approval.title}`,
       );
-      // On success the request moves to the decided list and this unmounts.
+      onEnd(true);
     } catch (err) {
       console.error(err);
       setError(messageFor(err));
       setSaving(null);
       inFlight.current = false;
+      onEnd(false);
     }
   }
 
   const base =
-    "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60";
+    "inline-flex flex-1 items-center justify-center gap-2 rounded-lg py-2.5 font-semibold disabled:cursor-not-allowed";
 
   return (
-    <div className="flex flex-col items-end gap-1">
+    <div className="grid gap-2">
       <div className="flex gap-2" aria-busy={saving !== null}>
-        <button
+        <motion.button
+          whileTap={{ scale: 0.95 }}
           onClick={() => decide("rejected")}
           disabled={saving !== null}
-          className={`${base} border border-zinc-300 dark:border-zinc-700`}
+          className={`${base} border-2 border-steel-deep text-ink-soft hover:border-expo hover:text-expo ${
+            saving === "approved" ? "opacity-40" : ""
+          }`}
         >
           {saving === "rejected" && <Spinner />}
           {saving === "rejected" ? "Rejecting…" : "Reject"}
-        </button>
-        <button
+        </motion.button>
+        <motion.button
+          whileTap={{ scale: 0.95 }}
           onClick={() => decide("approved")}
           disabled={saving !== null}
-          className={`${base} bg-emerald-600 text-white`}
+          className={`${base} bg-basil text-white shadow-[0_2px_0_#1f6141] hover:brightness-110 ${
+            saving === "rejected" ? "opacity-40" : ""
+          }`}
         >
           {saving === "approved" && <Spinner />}
           {saving === "approved" ? "Approving…" : "Approve"}
-        </button>
+        </motion.button>
       </div>
       {error && (
-        <p role="alert" className="text-right text-xs text-red-600">
+        <motion.p
+          role="alert"
+          initial={{ opacity: 0, y: -4 }}
+          animate={{ opacity: 1, y: 0, x: [0, -6, 6, -4, 4, 0] }}
+          transition={{ duration: 0.4 }}
+          className="text-sm font-medium text-expo"
+        >
           {error}
-        </p>
+        </motion.p>
       )}
     </div>
   );
@@ -85,7 +111,7 @@ function Spinner() {
   return (
     <span
       aria-hidden
-      className="size-3 animate-spin rounded-full border-2 border-current border-t-transparent"
+      className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent"
     />
   );
 }

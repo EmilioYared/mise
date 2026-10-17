@@ -1,5 +1,6 @@
 "use client";
 
+import { motion } from "motion/react";
 import { useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { submitApproval } from "@/lib/approvals";
@@ -33,15 +34,12 @@ export function RequestForm({ profile, onDone }: Props) {
   }
 
   const field =
-    "w-full rounded-lg border border-zinc-300 bg-transparent px-3 py-2 text-sm dark:border-zinc-700";
+    "w-full rounded-lg border-2 border-steel-deep bg-ticket px-3 py-2.5 focus:border-tape focus:outline-none";
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="grid gap-3 rounded-xl border border-zinc-200 p-4 dark:border-zinc-800"
-    >
-      <label className="grid gap-1 text-sm">
-        <span className="font-medium">What do you need?</span>
+    <form onSubmit={handleSubmit} className="grid gap-5">
+      <label className="grid gap-1.5">
+        <span className="text-sm font-semibold">What do you need?</span>
         <input
           autoFocus
           required
@@ -49,12 +47,12 @@ export function RequestForm({ profile, onDone }: Props) {
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="e.g. Replace the fryer thermostat"
-          className={field}
+          className={`${field} font-display text-2xl font-bold`}
         />
       </label>
-      <label className="grid gap-1 text-sm">
-        <span className="font-medium">
-          Details <span className="font-normal text-zinc-500">(optional)</span>
+      <label className="grid gap-1.5">
+        <span className="text-sm font-semibold">
+          Details <span className="font-normal text-ink-soft">(optional)</span>
         </span>
         <textarea
           rows={3}
@@ -67,26 +65,27 @@ export function RequestForm({ profile, onDone }: Props) {
       </label>
 
       {error && (
-        <p role="alert" className="text-sm text-red-600">
+        <p role="alert" className="text-sm font-medium text-expo">
           {error}
         </p>
       )}
 
-      <div className="flex justify-end gap-2">
+      <div className="flex justify-end gap-2 border-t border-dashed border-steel-deep pt-4">
         <button
           type="button"
           onClick={onDone}
-          className="rounded-lg px-3 py-2 text-sm text-zinc-600 dark:text-zinc-400"
+          className="rounded-lg px-4 py-2.5 font-medium text-ink-soft hover:bg-steel"
         >
           Cancel
         </button>
-        <button
+        <motion.button
           type="submit"
+          whileTap={{ scale: 0.95 }}
           disabled={sending || !title.trim()}
-          className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-white dark:text-zinc-900"
+          className="rounded-lg bg-tape px-5 py-2.5 font-semibold text-white shadow-[0_2px_0_#1d4fa8] disabled:opacity-50"
         >
           {sending ? "Sending…" : "Send request"}
-        </button>
+        </motion.button>
       </div>
     </form>
   );

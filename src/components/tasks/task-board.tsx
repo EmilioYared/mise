@@ -1,7 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
+import { Sheet } from "@/components/ui/sheet";
+import { isOverdue } from "@/lib/dates";
 import { sortTasks, type SortMode } from "@/lib/sort-tasks";
 import {
   createTask,
@@ -12,22 +15,71 @@ import {
   useTasks,
 } from "@/lib/tasks";
 import type { Store, Task, UserProfile } from "@/lib/types";
+import { useNow } from "@/lib/use-now";
+import { ShiftBoard } from "./shift-board";
 import { TaskForm } from "./task-form";
 import { TaskItem } from "./task-item";
+
+type Filter = "open" | "overdue" | "done";
+
+// How long a finished ticket stays in view, so its stamp can land.
+const LINGER_MS = 1100;
+// After a filter change the list keeps its old height while tickets swap,
+// then eases down to its new height.
+const HOLD_MS = 350;
+const RELEASE_MS = 600;
 
 type Props = { profile: UserProfile; store: Store };
 
 export function TaskBoard({ profile, store }: Props) {
   const tasks = useTasks(profile);
   const assignees = useAssignees(profile);
+  const now = useNow();
+  const [filter, setFilter] = useState<Filter>("open");
   const [sort, setSort] = useState<SortMode>("due");
-  // "new" for the create form, a task id while editing that task.
+  // "new" for the create sheet, a task id while editing that task.
   const [editing, setEditing] = useState<string | null>(null);
+  const [lingering, setLingering] = useState<string[]>([]);
+  const listRef = useRef<HTMLDivElement>(null);
+  const holdTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  // While set, the list keeps at least this height.
+  const [heldHeight, setHeldHeight] = useState<number>();
+  const [releasing, setReleasing] = useState(false);
 
   const isManager = profile.role === "manager";
   const names = new Map(assignees.map((p) => [p.uid, p.name]));
+  const all = tasks.status === "ready" ? tasks.value : [];
+  const overdueOf = (t: Task) =>
+    !t.done && isOverdue(t.dueDate, store.timeZone, now);
+
+  const counts = {
+    open: all.filter((t) => !t.done).length,
+    overdue: all.filter(overdueOf).length,
+    done: all.filter((t) => t.done).length,
+  };
+
+  // A ticket that was just finished keeps its place while its stamp lands,
+  // so it's sorted as if it were still open.
+  const shown = all.filter((t) => {
+    if (filter === "open") return !t.done || lingering.includes(t.id);
+    if (filter === "overdue") return overdueOf(t);
+    return t.done;
+  });
+  const byId = new Map(shown.map((t) => [t.id, t]));
+  const visible = sortTasks(
+    shown.map((t) => (lingering.includes(t.id) ? { ...t, done: false } : t)),
+    sort,
+  ).map((t) => byId.get(t.id)!);
+  const editingTask = all.find((t) => t.id === editing);
 
   function handleToggle(task: Task) {
+    if (!task.done) {
+      setLingering((ids) => [...ids, task.id]);
+      setTimeout(
+        () => setLingering((ids) => ids.filter((id) => id !== task.id)),
+        LINGER_MS,
+      );
+    }
     updateTask(task, { done: !task.done }).catch((err) => {
       console.error(err);
       toast.error("Couldn't update the task. Please try again.");
@@ -57,101 +109,218 @@ export function TaskBoard({ profile, store }: Props) {
     }
   }
 
+  // Switching to a shorter list would make the page shorter than the scroll
+  // position, and the browser would snap up in a single frame. Instead the
+  // list holds its old height while the tickets swap, then eases down to the
+  // new height, and the page follows it smoothly.
+  function changeFilter(next: Filter) {
+    if (next === filter) return;
+    holdTimers.current.forEach(clearTimeout);
+    setReleasing(false);
+    if (listRef.current) setHeldHeight(listRef.current.offsetHeight);
+    setFilter(next);
+
+    holdTimers.current = [
+      setTimeout(() => {
+        // Ease to the new list's own height, so the page shrinks evenly
+        // over the whole transition rather than all at the end.
+        const children = [...(listRef.current?.children ?? [])];
+        const natural = children.reduce(
+          (sum, el) => sum + (el as HTMLElement).offsetHeight,
+          0,
+        );
+        setReleasing(true);
+        setHeldHeight(natural);
+      }, HOLD_MS),
+      setTimeout(() => {
+        setReleasing(false);
+        setHeldHeight(undefined);
+      }, HOLD_MS + RELEASE_MS),
+    ];
+  }
+
+  const closeSheet = () => setEditing(null);
+
   return (
-    <section className="mt-8">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-lg font-semibold">
-          {isManager ? `${store.name} tasks` : "My tasks"}
-        </h2>
-        <div className="flex items-center gap-2">
-          <label className="text-sm text-zinc-500">
-            Sort by{" "}
-            <select
-              value={sort}
-              onChange={(e) => setSort(e.target.value as SortMode)}
-              className="rounded-md border border-zinc-300 bg-transparent px-2 py-1 text-sm text-zinc-900 dark:border-zinc-700 dark:text-zinc-100"
-            >
-              <option value="due">Due date</option>
-              <option value="priority">Priority</option>
-            </select>
-          </label>
-          <button
+    <>
+      <ShiftBoard {...counts} />
+
+      <div className="mt-8 flex flex-wrap items-center justify-between gap-4">
+        <Segmented
+          label="Show"
+          value={filter}
+          onChange={changeFilter}
+          options={[
+            { value: "open", label: "To do", count: counts.open },
+            { value: "overdue", label: "Overdue", count: counts.overdue },
+            { value: "done", label: "Done", count: counts.done },
+          ]}
+        />
+        <div className="flex items-center gap-3">
+          <Segmented
+            label="Sort by"
+            value={sort}
+            onChange={setSort}
+            options={[
+              { value: "due", label: "Due date" },
+              { value: "priority", label: "Priority" },
+            ]}
+          />
+          <motion.button
             onClick={() => setEditing("new")}
-            disabled={editing === "new"}
-            className="rounded-lg bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50 dark:bg-white dark:text-zinc-900"
+            whileTap={{ scale: 0.95 }}
+            className="rounded-lg bg-tape px-4 py-2.5 font-semibold text-white shadow-[0_2px_0_#1d4fa8] hover:brightness-110"
           >
             New task
-          </button>
+          </motion.button>
         </div>
       </div>
 
-      {editing === "new" && (
-        <div className="mt-4">
-          <TaskForm
-            me={profile}
-            assignees={assignees}
-            timeZone={store.timeZone}
-            onCancel={() => setEditing(null)}
-            onSubmit={async (input) => {
-              await createTask(store.id, input);
-              setEditing(null);
-              toast.success("Task added");
-            }}
-          />
-        </div>
-      )}
-
-      <div className="mt-4">
+      <div
+        ref={listRef}
+        className={`mt-6 ${
+          releasing
+            ? "transition-[min-height] duration-600 ease-in-out motion-reduce:transition-none"
+            : ""
+        }`}
+        style={heldHeight !== undefined ? { minHeight: heldHeight } : undefined}
+      >
         {tasks.status === "loading" && (
-          <p className="text-sm text-zinc-500">Loading tasks…</p>
+          <p className="text-sm text-ink-soft">Loading tasks…</p>
         )}
 
         {tasks.status === "error" && (
-          <p role="alert" className="text-sm text-red-600">
+          <p role="alert" className="text-sm text-expo">
             Couldn&apos;t load tasks. Check your connection and refresh.
           </p>
         )}
 
-        {tasks.status === "ready" &&
-          tasks.value.length === 0 &&
-          editing !== "new" && (
-            <p className="rounded-xl border border-dashed border-zinc-300 p-8 text-center text-sm text-zinc-500 dark:border-zinc-700">
-              No tasks yet. Add the first one.
-            </p>
-          )}
-
-        {tasks.status === "ready" && tasks.value.length > 0 && (
-          <ul className="grid gap-2">
-            {sortTasks(tasks.value, sort).map((task) =>
-              editing === task.id ? (
-                <li key={task.id}>
-                  <TaskForm
-                    task={task}
-                    me={profile}
-                    assignees={assignees}
-                    timeZone={store.timeZone}
-                    onCancel={() => setEditing(null)}
-                    onSubmit={async ({ title, dueDate, priority }) => {
-                      await updateTask(task, { title, dueDate, priority });
-                      setEditing(null);
-                    }}
-                  />
-                </li>
-              ) : (
+        {tasks.status === "ready" && (
+          <ul className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            <AnimatePresence mode="popLayout">
+              {visible.map((task) => (
                 <TaskItem
                   key={task.id}
                   task={task}
                   timeZone={store.timeZone}
+                  now={now}
                   ownerName={isManager ? names.get(task.ownerId) : undefined}
                   onToggle={() => handleToggle(task)}
                   onEdit={() => setEditing(task.id)}
                   onDelete={() => handleDelete(task)}
                 />
-              ),
-            )}
+              ))}
+            </AnimatePresence>
           </ul>
         )}
+
+        {tasks.status === "ready" && visible.length === 0 && (
+          <EmptyState filter={filter} onNew={() => setEditing("new")} />
+        )}
       </div>
-    </section>
+
+      <Sheet
+        open={editing !== null}
+        title={editingTask ? "Edit task" : "New task"}
+        onClose={closeSheet}
+      >
+        <TaskForm
+          key={editing ?? "closed"}
+          task={editingTask}
+          me={profile}
+          assignees={assignees}
+          timeZone={store.timeZone}
+          onCancel={closeSheet}
+          onSubmit={async (input) => {
+            if (editingTask) {
+              const { title, dueDate, priority } = input;
+              await updateTask(editingTask, { title, dueDate, priority });
+              toast.success("Task updated");
+            } else {
+              await createTask(store.id, input);
+              toast.success("Task added");
+            }
+            closeSheet();
+          }}
+        />
+      </Sheet>
+    </>
+  );
+}
+
+function EmptyState({ filter, onNew }: { filter: Filter; onNew: () => void }) {
+  const copy = {
+    open: "Nothing left on the rail. Add a task, or enjoy the quiet.",
+    overdue: "Nothing overdue. Every ticket is on time.",
+    done: "Nothing done yet. Finish a task and it lands here.",
+  }[filter];
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="rounded-2xl border-2 border-dashed border-steel-deep px-6 py-14 text-center"
+    >
+      <p className="font-display text-3xl font-black">{copy}</p>
+      {filter === "open" && (
+        <button
+          onClick={onNew}
+          className="mt-5 rounded-lg bg-ink px-4 py-2.5 font-semibold text-steel"
+        >
+          New task
+        </button>
+      )}
+    </motion.div>
+  );
+}
+
+type Option<T> = { value: T; label: string; count?: number };
+
+/** A row of choices with a pill that slides to the selected one. */
+function Segmented<T extends string>(props: {
+  label: string;
+  value: T;
+  onChange: (value: T) => void;
+  options: Option<T>[];
+}) {
+  const id = props.label.replace(/\s+/g, "-").toLowerCase();
+
+  return (
+    <div
+      role="radiogroup"
+      aria-label={props.label}
+      className="flex rounded-full bg-steel-deep/70 p-1"
+    >
+      {props.options.map((option) => {
+        const active = option.value === props.value;
+        return (
+          <button
+            key={option.value}
+            role="radio"
+            aria-checked={active}
+            onClick={() => props.onChange(option.value)}
+            className={`relative rounded-full px-3.5 py-1.5 text-sm font-semibold transition-colors ${
+              active ? "text-ink" : "text-ink-soft hover:text-ink"
+            }`}
+          >
+            {active && (
+              <motion.span
+                layoutId={`${id}-pill`}
+                className="absolute inset-0 rounded-full bg-ticket shadow-sm"
+                transition={{ type: "spring", stiffness: 500, damping: 36 }}
+              />
+            )}
+            <span className="relative">
+              {option.label}
+              {option.count !== undefined && (
+                <span className="ml-1.5 text-ink-soft tabular-nums">
+                  {option.count}
+                </span>
+              )}
+            </span>
+          </button>
+        );
+      })}
+    </div>
   );
 }
